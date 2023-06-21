@@ -1,13 +1,21 @@
 from tqdm import tqdm
+import argparse
+import re
 
+# parser = argparse.ArgumentParser()
+# parser.add_argument('xmfa', type=str)
+# parser.add_argument('fna', type=str)
+# args = parser.parse_args()
 
+xmfa_path = "parsnp.xmfa"
+fna_path = "./"
 
-with open("./parsnp.xmfa") as xmfa:
+with open(xmfa_path) as xmfa:
     line = xmfa.readline()
     line = xmfa.readline()
     seqNum = int(line.split()[1])
     seqs = {}
-    for i in range(seqNum):
+    for i in tqdm(range(seqNum)):
         line = xmfa.readline()
         line = xmfa.readline()
         seqName = line.split()[1]
@@ -21,43 +29,32 @@ with open("./parsnp.xmfa") as xmfa:
     intervalCount = int(line.split()[1])
     print(intervalCount)
 
-    
+    # Header parsing over
 
+    seqVerify = {}
+    for seq in range(seqNum):
+        seqVerify[seq+1] = []
 
-    # ref = open("./test-long/ref.fna", "r")
-    # test1 = open("./test-long/test1.fna", "r")
-    # test2 = open("./test-long/test2.fna", "r")
-    # test3 = open("./test-long/test3.fna", "r")
+    line = xmfa.readline()
 
-    
-    # while line:
-    #     if line[0] = '>':
-    #         seq = int(line[1])
+    with tqdm(total=intervalCount) as pbar:
+        while line:
+            alignment = re.split("-|:p| cluster| s|:|\s", line[1:])
+            # Here the alignments are in order: 
+            # [seqeunce number, starting coord, end coord, + or -, cluster number, contig number, coord in contig]
+            line = xmfa.readline()
+            if alignment[3] == "+":
+                seqVerify[int(alignment[0])].append((int(alignment[1]),line[:20]))
+            # notice that here only the first 20 are taken
+            # get to next alignment header
+            while(line and (initial:=line[0]) != '>'):
+                if initial == '=':
+                    pbar.update(1)
+                line = xmfa.readline()
 
+# parsing xmfa done.
 
-    
-
-
-    # ref.close()
-    # test1.close()
-    # test2.close()
-    # test3.close()
-    
-
-
-# with open('./test-long/test3.fna') as f:
-    # contig = 0
-    # line = f.readline()
-    # while line:
-    #     # print(start)
-    #     if line[0] == ">":
-    #         contig += 1
-    #     elif start < 80:
-    #         print(line[start:-2], end='')
-    #         line = f.readline()
-    #         print(line)
-    #         break
-    #     else:
-    #         start -= 80
-
-    #     line= f.readline()
+for seq in seqVerify:
+    path = seqs[seq]
+    with open(fna_path+path) as fna:
+        print("1")
