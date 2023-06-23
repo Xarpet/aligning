@@ -3,16 +3,18 @@ import argparse
 import re
 from datetime import datetime
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('xmfa', type=str)
-# parser.add_argument('fna', type=str)
-# args = parser.parse_args()
+parser = argparse.ArgumentParser()
+parser.add_argument('xmfa', type=str, help="the path to the xmfa file you are trying to verify")
+parser.add_argument('ref', type=str, help="the path to the referrence fna file")
+parser.add_argument('fna', type=str, help="the path to all the fna files")
+args = parser.parse_args()
 
-xmfa_path = "./parsnp.xmfa"
-ref_path = "./"
-fna_path = "./test/"
+xmfa_path = args.xmfa
+ref_path = args.ref
+fna_path = args.fna
 
 def compare_with_dashes(str1, str2):
+    # ignores the dashes when comparing
     if str1 == str2:
         return True
     if len(str1) != len(str2):
@@ -38,11 +40,8 @@ with open(xmfa_path) as xmfa:
         line = xmfa.readline()
         line = xmfa.readline()
 
-    # print(seqs)
-
     line = xmfa.readline()
     intervalCount = int(line.split()[1])
-    # print(intervalCount)
 
     # Header parsing over
 
@@ -56,7 +55,8 @@ with open(xmfa_path) as xmfa:
         while line:
             alignment = re.split("-|:p| cluster| s|:|\s", line[1:])
             # Here the alignments are in order:
-            # [seqeunce number, starting coord, end coord, + or -, cluster number, contig number, coord in contig]
+            # [seqeunce number, starting coord, end coord, ...
+            # + or -, cluster number, contig number, coord in contig]
             line = xmfa.readline()
             if alignment[3] == "+":
                 seqVerify[int(alignment[0])].append(
@@ -98,6 +98,7 @@ with open(current_time+".txt", "x") as f:
                             # print(counter)
                             # print(length)
                             f.write("sequence: " + str(seq) + "\n")
+                            f.write("file name: " + seqs[seq] + "\n")
                             f.write("position: " + str(target) + "\n")
                             f.write("fna: " + compare[:cutoff].lower() + "\n")
                             f.write("xmfa: " + correct[:cutoff].lower() + "\n")
