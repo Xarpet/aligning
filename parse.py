@@ -2,7 +2,15 @@ from tqdm import tqdm
 import argparse
 import re
 from datetime import datetime
+from Bio import SeqIO
+from functools import reduce
+import operator
 
+# python parse.py parsnp.xmfa ./ ./test/
+
+# I made them positional arguments so that there's no need of dashes
+# also I feel like we could just use the file names in xmfa? that way we
+# only need to provide path to all the fna files; not sure
 parser = argparse.ArgumentParser()
 parser.add_argument('xmfa', type=str, help="the path to the xmfa file you are trying to verify")
 parser.add_argument('ref', type=str, help="the path to the referrence fna file")
@@ -19,11 +27,8 @@ def compare_with_dashes(str1, str2):
         return True
     if len(str1) != len(str2):
         return False
-    for index in range(len(str1)):
-        if (char1:=str1[index]) != (char2:=str2[index]):
-            if char1 != '-' and char2 != '-':
-                return False
-    return True
+    else:
+        return all(c1 == c2 for (c1, c2) in filter(lambda pair: '-' not in pair, zip(str1, str2)))
 
 with open(xmfa_path) as xmfa:
     line = xmfa.readline()
@@ -59,6 +64,7 @@ with open(xmfa_path) as xmfa:
             # + or -, cluster number, contig number, coord in contig]
             line = xmfa.readline()
             if alignment[3] == "+":
+                # here only forward alignments are used
                 seqVerify[int(alignment[0])].append(
                     (int(alignment[1]), line[:20]))
             # notice that here only the first 20 are taken
@@ -75,6 +81,28 @@ now = datetime.now()
 current_time = now.strftime("%Y-%m-%d-%H%M%S")
 
 with open(current_time+".txt", "x") as f:
+    for seq, coords in tqdm(seqVerify.items()):
+        if seq == 1:
+            path = ref_path + seqs[seq]
+        else:
+            path = fna_path + seqs[seq]
+        dna = str(reduce(operator.add, [record.seq for record in SeqIO.parse(path, "fasta")]))
+        # flatmapping all sequence together
+        for target, correct in coords:
+            length = len(correct)
+            if not compare_with_dashes(compare:=dna[target:target+length].lower(), correct.lower()):
+                f.write("sequence: " + str(seq) + "\n")
+                f.write("file name: " + seqs[seq] + "\n")
+                f.write("position: " + str(target) + "\n")
+                if (actual_pos:=dna.lower().find(correct)) != (-1):
+                    f.write("actual position: " + str(actual_pos) + '\n')
+                f.write("fna: " + compare + "\n")
+                f.write("xmfa: " + correct.lower() + "\n")
+                f.write("----" + "\n")
+
+
+# legacy code
+"""
     for seq, coords in tqdm(seqVerify.items()):
         if seq == 1:
             path = ref_path + seqs[seq]
@@ -111,3 +139,4 @@ with open(current_time+".txt", "x") as f:
                     if line[0] != '>':
                         counter += len(line.strip())
                         # updating the counter for every non-header line
+"""
