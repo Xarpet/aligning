@@ -1,12 +1,14 @@
-from tqdm import tqdm
-import argparse
-import re
-from datetime import datetime
-from Bio import SeqIO
 from functools import reduce
 import operator
+import os
+import re
+from tqdm import tqdm
+import argparse
+from datetime import datetime
+from Bio import SeqIO
+from Bio import AlignIO
 
-# python parse.py parsnp.xmfa ./ ./test/
+# python parse.py parsnp.xmfa ./ ./test/ -m
 
 # I made them positional arguments so that there's no need of dashes
 # also I feel like we could just use the file names in xmfa? that way we
@@ -15,11 +17,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('xmfa', type=str, help="the path to the xmfa file you are trying to verify")
 parser.add_argument('ref', type=str, help="the path to the referrence fna file")
 parser.add_argument('fna', type=str, help="the path to all the fna files")
+parser.add_argument('-m', '--maf', action='store_true', help="exports a .maf file translated from the xmfa file")
 args = parser.parse_args()
 
 xmfa_path = args.xmfa
 ref_path = args.ref
 fna_path = args.fna
+maf_flag = args.maf
 
 def compare_with_dashes(str1, str2):
     # ignores the dashes when comparing
@@ -99,6 +103,29 @@ with open(current_time+".txt", "x") as f:
                 f.write("fna: " + compare + "\n")
                 f.write("xmfa: " + correct.lower() + "\n")
                 f.write("----" + "\n")
+
+
+if maf_flag:
+    data = []
+    with open(xmfa_path, "r+") as xmfa:
+        for line in xmfa:
+            if line[0] == '>' and line[1] != " ":
+                data.append("> " + line[1:])
+            else:
+                data.append(line)
+
+    with open("temp_xmfa", 'x') as tmp:
+        for d in data:
+            tmp.write(d)
+
+    alignments = AlignIO.parse("temp_xmfa", 'mauve')
+
+    with open(current_time+".maf", "x") as file:
+        maf = AlignIO.MafIO.MafWriter(file)
+        for align in alignments:
+            maf.write_alignment(align)
+
+    os.remove("temp_xmfa")
 
 
 # legacy code
