@@ -69,8 +69,7 @@ with open(xmfa_path) as xmfa:
             line = xmfa.readline()
             if alignment[3] == "+":
                 # here only forward alignments are used
-                seqVerify[int(alignment[0])].append(
-                    (int(alignment[1]), line[:20]))
+                seqVerify[int(alignment[0])].append((int(alignment[1]), line[:20]))
             # notice that here only the first 20 are taken
             # get to next alignment header
             while line and (initial := line[0]) != '>':
