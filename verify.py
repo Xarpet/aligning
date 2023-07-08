@@ -12,7 +12,7 @@ from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
 
 
-# python parse.py parsnp.xmfa ./ ./test/ -m -f
+# python verify.py parsnp.xmfa ./ ./test/ -m -f
 
 # I made them positional arguments so that there's no need of dashes
 # also I feel like we could just use the file names in xmfa? that way we
@@ -69,10 +69,11 @@ with open(xmfa_path) as xmfa:
 
     with tqdm(total=intervalCount) as pbar:
         while line:
-            alignment = re.split("-|:p| cluster| s|:|\s", line[1:])
+            alignment = re.split(":p-|-|:p| cluster| s|:|\s", line[1:])
             # Here the alignments are in order:
             # [seqeunce number, starting coord, end coord, ...
             # + or -, cluster number, contig number, coord in contig]
+            # TODO parse the negative coords correctly
             line = xmfa.readline()
             if alignment[3] == "+":
                 # here only forward alignments are used
