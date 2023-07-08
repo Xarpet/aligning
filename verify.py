@@ -6,9 +6,13 @@ from tqdm import tqdm
 import argparse
 from datetime import datetime
 from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 from Bio import AlignIO
+from Bio.Align import MultipleSeqAlignment
 
-# python parse.py parsnp.xmfa ./ ./test/ -m
+
+# python verify.py parsnp.xmfa ./ ./test/ -m -f
 
 # I made them positional arguments so that there's no need of dashes
 # also I feel like we could just use the file names in xmfa? that way we
@@ -18,12 +22,15 @@ parser.add_argument('xmfa', type=str, help="the path to the xmfa file you are tr
 parser.add_argument('ref', type=str, help="the path to the referrence fna file")
 parser.add_argument('fna', type=str, help="the path to all the fna files")
 parser.add_argument('-m', '--maf', action='store_true', help="exports a .maf file translated from the xmfa file")
+parser.add_argument('-f', '--find_actual', action='store_true', 
+    help="find the actual coordinates of the misplaced alignments. Slowing it down significantly")
 args = parser.parse_args()
 
 xmfa_path = args.xmfa
 ref_path = args.ref
 fna_path = args.fna
 maf_flag = args.maf
+find_flag = args.find_actual
 
 def compare_with_dashes(str1, str2):
     # ignores the dashes when comparing
@@ -62,15 +69,16 @@ with open(xmfa_path) as xmfa:
 
     with tqdm(total=intervalCount) as pbar:
         while line:
-            alignment = re.split("-|:p| cluster| s|:|\s", line[1:])
+            alignment = re.split(":p-|-|:p| cluster| s|:|\s", line[1:])
             # Here the alignments are in order:
             # [seqeunce number, starting coord, end coord, ...
             # + or -, cluster number, contig number, coord in contig]
+            # TODO parse the negative coords correctly
             line = xmfa.readline()
             if alignment[3] == "+":
                 # here only forward alignments are used
-                seqVerify[int(alignment[0])].append(
-                    (int(alignment[1]), line[:20]))
+                # here we store the contig and coord relative to contig.
+                seqVerify[int(alignment[0])].append((int(alignment[5]), int(alignment[6]), line[:20]))
             # notice that here only the first 20 are taken
             # get to next alignment header
             while line and (initial := line[0]) != '>':
@@ -84,24 +92,33 @@ now = datetime.now()
 
 current_time = now.strftime("%Y-%m-%d-%H%M%S")
 
+contig_size = {}
+
 with open(current_time+".txt", "x") as f:
     for seq, coords in tqdm(seqVerify.items()):
         if seq == 1:
             path = ref_path + seqs[seq]
         else:
             path = fna_path + seqs[seq]
-        dna = str(reduce(operator.add, [record.seq for record in SeqIO.parse(path, "fasta")]))
-        # flatmapping all sequence together
-        for target, correct in coords:
-            length = len(correct)
-            if not compare_with_dashes(compare:=dna[target:target+length].lower(), correct.lower()):
+        dna = [record.seq for record in SeqIO.parse(path, "fasta")]
+        contig_size[seq] = {i+1: len(contig) for i, contig in enumerate(dna)}
+        # here we store the size of each contig (index starting with 1)
+        # to prepare for the .maf file
+        for contig, target, xmfa_seq in coords:
+            length = len(xmfa_seq)
+            if not compare_with_dashes(fna_seq:=dna[contig-1][target:target+length].lower(), xmfa_seq.lower()):
                 f.write("sequence: " + str(seq) + "\n")
                 f.write("file name: " + seqs[seq] + "\n")
-                f.write("position: " + str(target) + "\n")
-                if (actual_pos:=dna.lower().find(correct)) != (-1):
-                    f.write("actual position: " + str(actual_pos) + '\n')
-                f.write("fna: " + compare + "\n")
-                f.write("xmfa: " + correct.lower() + "\n")
+                f.write("position in xmfa: s" + str(contig) + ":p" + str(target) + "\n")
+                actual_pos = None
+                if find_flag:
+                    for cont, s in enumerate(dna):
+                        if (pos:=s.lower().find(xmfa_seq.lower())) != (-1):
+                            actual_pos = (cont+1, pos)
+                if actual_pos:
+                    f.write("actual position: s" + str(actual_pos[0]) + ":p" + str(actual_pos[1]) + '\n')
+                f.write("fna: " + str(fna_seq) + "\n")
+                f.write("xmfa: " + xmfa_seq.lower() + "\n")
                 f.write("----" + "\n")
 
 
@@ -119,51 +136,33 @@ if maf_flag:
             tmp.write(d)
 
     alignments = AlignIO.parse("temp_xmfa", 'mauve')
+    # starting to create new MultipleSequenceAlignment objects
+    # here only start, strand and srcSize is needed for maf to format
+    # size of alignment is calculated by Biopython
+    # Only thing we don't just get from original id is file name and contig size.
+    new_msas = []
+    for block, aln in enumerate(alignments):
+        msa = []
+        for index, seq in enumerate(aln):
+            og_id = re.split(" s|:p|/", seq.id)
+            # [cluster, contig index, pos relative to contig, absolute pos]
+            new_seq = SeqRecord(
+                seq.seq,
+                name = seq.name,
+                id = seqs[index+1].split(".")[0] + ":" + og_id[1],
+                annotations={
+                    "start": og_id[2],
+                    "strand": seq.annotations["strand"],
+                    "srcSize": contig_size[index+1][int(og_id[1])]
+                }
+            )
+            msa.append(new_seq)
+        align = MultipleSeqAlignment(msa)
+        new_msas.append(align)
 
     with open(current_time+".maf", "x") as file:
         maf = AlignIO.MafIO.MafWriter(file)
-        for align in alignments:
+        for align in new_msas:
             maf.write_alignment(align)
 
     os.remove("temp_xmfa")
-
-
-# legacy code
-"""
-    for seq, coords in tqdm(seqVerify.items()):
-        if seq == 1:
-            path = ref_path + seqs[seq]
-        else:
-            path = fna_path + seqs[seq]
-        coords.sort(key=lambda x: x[0])
-        with open(path) as fna:
-            it_coords = iter(coords)
-            counter = 0
-            target, correct = next(it_coords, (None, None))
-            line = fna.readline()
-            while line and target:
-                if counter >= target:
-                    # if we hit over the target, get the relative position and start
-                    # comparing fna (`compare`) to xmfa (`correct`)
-                    pos = target - (counter - (len(line) - 1))
-                    compare = line[pos:].strip()
-                    if (length := len(compare)) > 5:
-                        cutoff = min(20, length)
-                        if not compare_with_dashes(correct[:cutoff].lower(), compare[:cutoff].lower()):
-                            # print(counter)
-                            # print(length)
-                            f.write("sequence: " + str(seq) + "\n")
-                            f.write("file name: " + seqs[seq] + "\n")
-                            f.write("position: " + str(target) + "\n")
-                            f.write("fna: " + compare[:cutoff].lower() + "\n")
-                            f.write("xmfa: " + correct[:cutoff].lower() + "\n")
-                            f.write("----" + "\n")
-
-                    target, correct = next(it_coords, (None, None))
-                    # updating the target
-                else:
-                    line = fna.readline()
-                    if line[0] != '>':
-                        counter += len(line.strip())
-                        # updating the counter for every non-header line
-"""
