@@ -40,7 +40,9 @@ def compare_with_dashes(str1, str2):
     if len(str1) != len(str2):
         return False
     else:
-        return all(c1 == c2 for (c1, c2) in filter(lambda pair: '-' not in pair, zip(str1, str2)))
+        return all(c1 == c2 for (c1, c2) in filter(lambda pair: '-' not in pair, zip(str1, str2))) or \
+        all(c1 == c2 for (c1, c2) in zip(filter(lambda x: x!='-', str1),(filter(lambda x: x!='-', str2))))
+        # deals with gaps
 
 
 def reverse_complement(str1):
@@ -123,7 +125,7 @@ with open(current_time+".txt", "x") as f:
                 fna_seq=dna[contig-1][target:target+length].lower()
             if strand == '-':
                 fna_seq=reverse_complement(dna[contig-1].lower()[target-length:target])
-            if not compare_with_dashes(fna_seq, xmfa_seq.lower()):
+            if len(fna_seq) == len(xmfa_seq) and not compare_with_dashes(fna_seq, xmfa_seq.lower()):
                 f.write("sequence: " + str(seq) + "\n")
                 f.write("file name: " + seqs[seq] + "\n")
                 f.write("strand: " + str(strand) + "\n")
@@ -131,8 +133,9 @@ with open(current_time+".txt", "x") as f:
                 actual_pos = None
                 if find_flag:
                     if strand == '+':
-                        if (pos:=dna[contig-1].lower().find(xmfa_seq.lower())) != (-1):
-                            actual_pos = (contig, pos)
+                        for cont, s in enumerate(dna):
+                            if (pos:=s.lower().find(xmfa_seq.lower())) != (-1):
+                                actual_pos = (cont+1, pos)
                     else:
                         if (pos:=(dna[contig-1].lower().find(reverse_complement(xmfa_seq.lower())))) != (-1):
                             actual_pos = (contig, pos)
