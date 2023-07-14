@@ -122,7 +122,7 @@ with open(current_time+".txt", "x") as f:
             if strand == '+':
                 fna_seq=dna[contig-1][target:target+length].lower()
             if strand == '-':
-                fna_seq=reverse_complement(dna[contig-1]).lower()[seq_length-target:seq_length-target+length]
+                fna_seq=reverse_complement(dna[contig-1].lower()[target-length:target])
             if not compare_with_dashes(fna_seq, xmfa_seq.lower()):
                 f.write("sequence: " + str(seq) + "\n")
                 f.write("file name: " + seqs[seq] + "\n")
@@ -134,13 +134,16 @@ with open(current_time+".txt", "x") as f:
                         if (pos:=dna[contig-1].lower().find(xmfa_seq.lower())) != (-1):
                             actual_pos = (contig, pos)
                     else:
-                        if (pos:=(reverse_complement(dna[contig-1]).lower().find(xmfa_seq.lower()))) != (-1):
+                        if (pos:=(dna[contig-1].lower().find(reverse_complement(xmfa_seq.lower())))) != (-1):
                             actual_pos = (contig, pos)
                             # find in reverse conplement for reverse strands 
                 if actual_pos:
                     f.write("actual position: s" + str(actual_pos[0]) + ":p" + str(actual_pos[1]) + '\n')
                     f.write(f"Seq length:{seq_length}, target:{target}, alignment length:{alignment_length}, xmfa length:{length} \n")
-                    f.write(f"{actual_pos[1]-(seq_length-target-1)}\n")
+                    if strand == '-':
+                        f.write(f"{(target-length)-actual_pos[1]}\n")
+                    else:
+                        f.write(f"{target-1-actual_pos[1]}\n")
                 f.write("fna: " + str(fna_seq) + "\n")
                 f.write("xmfa: " + xmfa_seq.lower() + "\n")
                 f.write("----" + "\n")
