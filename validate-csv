@@ -134,7 +134,7 @@ with open(current_time+".txt", "x") as f:
             target = coords[3]
             xmfa_seq = coords[4]
             #for alignment_length, strand, contig, target, xmfa_seq in coords:
-            dict={}test/validate-reverse-ada.pytest/validate-reverse-ada.py
+            dict={}
             dict["sequence"] = seq
             dict["file name"] = seqs[seq]
             dict["strand"] = strand
@@ -147,9 +147,9 @@ with open(current_time+".txt", "x") as f:
             if contig == 1 and target ==1:
                 target = 0 
             if strand == '+':
-                fna_seq=dna[contig-1][target:target+length].lower()
+                fna_seq=dna[contig-1][target-1:target-1+length].lower()
             if strand == '-':
-                fna_seq=reverse_complement(dna[contig-1].lower()[target-length:target])
+                fna_seq=reverse_complement(dna[contig-1].lower()[target-1-length:target-1])
             if len(fna_seq) == len(xmfa_seq) and not compare_with_dashes(fna_seq, xmfa_seq.lower()):
                 f.write("sequence: " + str(seq) + "\n")
                 f.write("file name: " + seqs[seq] + "\n")

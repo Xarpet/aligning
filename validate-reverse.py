@@ -28,8 +28,8 @@ parser.add_argument('-f', '--find_actual', action='store_true',
 args = parser.parse_args()
 
 xmfa_path = args.xmfa
-ref_path = args.ref
-fna_path = args.fna
+ref_path = args.ref+("/" if args.ref[-1] != "/" else "")
+fna_path = args.fna+("/" if args.fna[-1] != "/" else "")
 maf_flag = args.maf
 find_flag = args.find_actual
 
@@ -89,7 +89,7 @@ with open(xmfa_path) as xmfa:
             line = xmfa.readline()
                 # here only forward alignments are used
                 # here we store the contig and coord relative to contig.
-            seqVerify[int(alignment[0])].append((int(alignment[2])-int(alignment[1]),alignment[3],int(alignment[5]), int(alignment[6]), line[:20]))
+            seqVerify[int(alignment[0])].append((int(alignment[2])-int(alignment[1]),alignment[3],int(alignment[5]), int(alignment[6]), line[:40]))
             
             # notice that here only the first 20 are taken
             # get to next alignment header
@@ -107,7 +107,6 @@ current_time = now.strftime("%Y-%m-%d-%H%M%S")
 contig_size = {}
 
 
-counter = 0
 with open(current_time+".txt", "x") as f:
     for seq, coords in tqdm(seqVerify.items()):
         if seq == 1:
@@ -122,9 +121,9 @@ with open(current_time+".txt", "x") as f:
             seq_length = contig_size[seq][contig]
             length = len(xmfa_seq.strip()) 
             if strand == '+':
-                fna_seq=dna[contig-1][target:target+length].lower()
+                fna_seq=dna[contig-1][target-1:target+length-1].lower()
             if strand == '-':
-                fna_seq=reverse_complement(dna[contig-1].lower()[target-length:target])
+                fna_seq=reverse_complement(dna[contig-1].lower()[target-length-1:target-1])
             if len(fna_seq) == len(xmfa_seq) and not compare_with_dashes(fna_seq, xmfa_seq.lower()):
                 f.write("sequence: " + str(seq) + "\n")
                 f.write("file name: " + seqs[seq] + "\n")
@@ -144,15 +143,13 @@ with open(current_time+".txt", "x") as f:
                     f.write("actual position: s" + str(actual_pos[0]) + ":p" + str(actual_pos[1]) + '\n')
                     f.write(f"Seq length:{seq_length}, target:{target}, alignment length:{alignment_length}, xmfa length:{length} \n")
                     if strand == '-':
-                        f.write(f"{(target-length)-actual_pos[1]}\n")
+                        f.write(f"{(target-length-1)-actual_pos[1]}\n")
                     else:
                         f.write(f"{target-1-actual_pos[1]}\n")
                 f.write("fna: " + str(fna_seq) + "\n")
                 f.write("xmfa: " + xmfa_seq.lower() + "\n")
                 f.write("----" + "\n")
-            elif strand == '-':
-                counter += 1
-print(counter)
+
 
 
 
