@@ -10,6 +10,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
+import csv
 
 
 # python verify.py parsnp.xmfa ./ ./test/ -m -f
@@ -25,6 +26,9 @@ parser.add_argument('fna', type=str, help="the path to all the fna files")
 parser.add_argument('-m', '--maf', action='store_true', help="exports a .maf file translated from the xmfa file")
 parser.add_argument('-f', '--find_actual', action='store_true', 
     help="find the actual coordinates of the misplaced alignments. Slowing it down significantly")
+parser.add_argument('-c', '--csv', action='store_true', 
+    help="output results in csv file")
+
 args = parser.parse_args()
 
 xmfa_path = args.xmfa
@@ -32,6 +36,7 @@ ref_path = args.ref+("/" if args.ref[-1] != "/" else "")
 fna_path = args.fna+("/" if args.fna[-1] != "/" else "")
 maf_flag = args.maf
 find_flag = args.find_actual
+csv_flag = args.csv
 
 def compare_with_dashes(str1, str2):
     # ignores the dashes when comparing
@@ -106,7 +111,7 @@ current_time = now.strftime("%Y-%m-%d-%H%M%S")
 
 contig_size = {}
 
-
+csvdata=[]
 with open(current_time+".txt", "x") as f:
     for seq, coords in tqdm(seqVerify.items()):
         if seq == 1:
@@ -118,6 +123,14 @@ with open(current_time+".txt", "x") as f:
         # here we store the size of each contig (index starting with 1)
         # to prepare for the .maf file
         for alignment_length, strand, contig, target, xmfa_seq in coords:
+            dict={}
+            dict["sequence"] = seq
+            dict["file name"] = seqs[seq]
+            dict["strand"] = strand
+            dict["contig number"] = contig
+            dict["contig position"] = target 
+            dict["actual contig number"] = None
+            dict["actual contig position"] = None
             seq_length = contig_size[seq][contig]
             length = len(xmfa_seq.strip()) 
             if strand == '+':
@@ -129,6 +142,7 @@ with open(current_time+".txt", "x") as f:
                 f.write("file name: " + seqs[seq] + "\n")
                 f.write("strand: " + str(strand) + "\n")
                 f.write("position in xmfa: s" + str(contig) + ":p" + str(target) + "\n")
+                dict["difference between actual position and xmfa output"] = None
                 actual_pos = None
                 if find_flag:
                     if strand == '+':
@@ -142,15 +156,37 @@ with open(current_time+".txt", "x") as f:
                 if actual_pos:
                     f.write("actual position: s" + str(actual_pos[0]) + ":p" + str(actual_pos[1]) + '\n')
                     f.write(f"Seq length:{seq_length}, target:{target}, alignment length:{alignment_length}, xmfa length:{length} \n")
+                    dict["actual contig number"] = actual_pos[0]
+                    dict["actual contig position"] = actual_pos[1]
                     if strand == '-':
                         f.write(f"{(target-length-1)-actual_pos[1]}\n")
+                        dict["difference between actual position and xmfa output"] = (target-length)-actual_pos[1]
                     else:
                         f.write(f"{target-1-actual_pos[1]}\n")
+                        if actual_pos[0] == contig:
+                                dict["difference between actual position and xmfa output"] = target-1-actual_pos[1]
                 f.write("fna: " + str(fna_seq) + "\n")
                 f.write("xmfa: " + xmfa_seq.lower() + "\n")
+                dict["fna"] = str(fna_seq)
+                dict["xmfa"] = xmfa_seq.lower()
                 f.write("----" + "\n")
+            else:
+                dict["difference between actual position and xmfa output"] = 0
+                dict["fna"] = str(fna_seq)
+                dict["xmfa"] = xmfa_seq.lower()
+            csvdata.append(dict)
 
+if csv_flag:
+    fieldnames = csvdata[0].keys()
+    csv_file_path = current_time+".csv"
+    with open(csv_file_path, 'w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
 
+        # Write column headers
+        writer.writeheader()
+
+        # Write the data rows
+        writer.writerows(csvdata)
 
 
 if maf_flag:
